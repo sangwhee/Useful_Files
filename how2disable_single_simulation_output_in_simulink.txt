@@ -1,0 +1,2 @@
+How to disable simulink2work space giving sim.out file to workspace
+https://www.youtube.com/watch?v=sd6T2wVOaOk
