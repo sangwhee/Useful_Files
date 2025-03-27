@@ -1,0 +1,59 @@
+function f = myfun1st(x, coeff, windingType)
+
+C_C1 = coeff(1)*x(1);
+C_C2 = coeff(2)*x(2);
+
+L_C1 = coeff(3)*x(3);
+L_C2 = coeff(4)*x(4);
+
+R_C1 = coeff(5)*x(5);
+R_C2 = coeff(6)*x(6);
+
+R_Ce1 = coeff(7)*x(7);
+if windingType == 0
+    [f_CM,Zmag_CM,theta_CM] = getImpedanceData('CW-ZABCG+GROUND+CABLE.CSV');
+else
+    [f_CM,Zmag_CM,theta_CM] = getImpedanceData('TW-ZABCG+GROUND+CABLE.CSV');
+end
+
+index1 = find(f_CM>=150e3,1);
+index2 = find(f_CM>=30e6,1);
+
+f_CM = f_CM(index1:index2);
+Zmag_CM = Zmag_CM(index1:index2);
+
+Zmag_CM_meas = mag2db(Zmag_CM);
+
+s = 1j*2*pi*f_CM;
+
+%% fold equation
+Z_CM_model_1stOrder_LC = ((C_C1.*C_C2.*L_C1.*L_C2.*R_C1 + C_C1.*C_C2.*L_C1.*L_C2.*R_C2 + C_C1.*C_C2.*L_C1.*L_C2.*R_Ce1).*s.^4 ...
+    + (C_C1.*L_C1.*L_C2 + C_C2.*L_C1.*L_C2 + C_C1.*C_C2.*L_C1.*R_C1.*R_C2 ...
+    + C_C1.*C_C2.*L_C1.*R_C2.*R_Ce1 + C_C1.*C_C2.*L_C2.*R_C1.*R_Ce1 + C_C1.*C_C2.*L_C2.*R_C2.*R_Ce1).*s.^3 ...
+    + (C_C1.*L_C1.*R_C1 + C_C2.*L_C1.*R_C2 + C_C1.*L_C1.*R_Ce1 + C_C1.*L_C2.*R_Ce1 + C_C2.*L_C2.*R_Ce1 ...
+    + C_C1.*C_C2.*R_C1.*R_C2.*R_Ce1).*s.^2 + (L_C1 + C_C1.*R_C1.*R_Ce1 + C_C2.*R_C2.*R_Ce1).*s + R_Ce1)./...
+    ((C_C1.*C_C2.*L_C1.*R_C1 + C_C1.*C_C2.*L_C1.*R_C2 + C_C1.*C_C2.*L_C1.*R_Ce1).*s.^3 ...
+    + (C_C1.*L_C1 + C_C2.*L_C1 + C_C1.*C_C2.*R_C1.*R_Ce1 + C_C1.*C_C2.*R_C2.*R_Ce1).*s.^2 ...
+    + (C_C1.*R_Ce1 + C_C2.*R_Ce1).*s);
+%%
+Zmag_CM_model = mag2db(abs(Z_CM_model_1stOrder_LC));
+
+if windingType == 0 % winding type is CW
+
+    W = f_CM<4559400 | f_CM>15602200 & f_CM <18383300 ;
+
+    [val1,index1] = min(Zmag_CM_meas);
+    [val2,index2] = min(Zmag_CM_model);
+    f = sum(1.*(Zmag_CM_meas-Zmag_CM_model).^2) ... % cost function
+        + 0*(val1-val2)^2 ...
+        + 0e-9*(f_CM(index1)-f_CM(index2))^2;% I want C_C3 to be small!
+
+else % winding type is TW
+    
+    [val1,index1] = min(Zmag_CM_meas);
+    [val2,index2] = min(Zmag_CM_model);
+    f = sum((Zmag_CM_meas-Zmag_CM_model).^2) ... % cost function
+        + 0*(val1-val2)^2 ...
+        + 0e-9*(f_CM(index1)-f_CM(index2))^2;% I want C_C3 to be small!
+end
+end
